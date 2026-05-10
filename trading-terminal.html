@@ -468,18 +468,34 @@ function updateLabels(){
 }
 
 // ─── LIVE DATA FETCHER ───────────────────────────────────────────────────────
+const PROXY = 'https://trading-proxy.isciogluhakki.workers.dev';
+
 async function fetchLiveData(mkt, strat) {
   const data = { prices: {}, market: {} };
+
+  const indices = {
+    'NASDAQ': 'QQQ,AAPL,NVDA,MSFT,META,GOOGL,AMZN,TSLA,AMD,SMCI',
+    'S&P 500': 'SPY,AAPL,NVDA,MSFT,JPM,JNJ,V,PG,XOM,BRK-B',
+    'NYSE': 'KO,JPM,JNJ,XOM,CVX,BAC,WFC,GE,IBM,T',
+    'BIST': 'THYAO.IS,EREGL.IS,ASELS.IS,BIMAS.IS,AKBNK.IS,GARAN.IS,KCHOL.IS,TUPRS.IS,SISE.IS,FROTO.IS',
+    'Küresel': 'SPY,QQQ,EFA,EEM,GLD,TLT,DXY,VIX',
+    'Global': 'SPY,QQQ,EFA,EEM,GLD,TLT',
+    'AB': 'EZU,ASML,SAP,EWG,EWF,EWI,EWP',
+    'EU': 'EZU,ASML,SAP,EWG,EWF',
+    'Japonya': 'EWJ,NKY,7203.T,6758.T,9984.T',
+    'Japan': 'EWJ,NKY',
+  };
+
+  const isCrypto = mkt === 'Kripto' || mkt === 'Crypto' || strat === 'Kripto' || strat === 'Crypto';
+
   try {
-    // Crypto prices via CoinGecko (no CORS, no key needed)
-    const isCrypto = mkt === 'Kripto' || mkt === 'Crypto' || strat === 'Kripto' || strat === 'Crypto';
+    // Fetch crypto prices
     if (isCrypto) {
-      const coins = 'bitcoin,ethereum,solana,binancecoin,ripple,cardano,avalanche-2,chainlink,polkadot,matic-network';
-      const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`);
+      const r = await fetch(PROXY + '/crypto', {signal: AbortSignal.timeout(8000)});
       if (r.ok) {
         const d = await r.json();
         const map = {bitcoin:'BTC',ethereum:'ETH',solana:'SOL',binancecoin:'BNB',ripple:'XRP',cardano:'ADA','avalanche-2':'AVAX',chainlink:'LINK',polkadot:'DOT','matic-network':'MATIC'};
-        let priceStr = '\n\n=== GÜNCEL KRİPTO FİYATLARI (CoinGecko, canlı) ===\n';
+        let priceStr = '\n\n=== GÜNCEL KRİPTO FİYATLARI (CoinGecko canlı, ' + new Date().toLocaleTimeString('tr-TR') + ') ===\n';
         for (const [id, sym] of Object.entries(map)) {
           if (d[id]) {
             priceStr += `${sym}: $${d[id].usd.toLocaleString()} (24s: ${d[id].usd_24h_change?.toFixed(2)}%)\n`;
@@ -489,53 +505,34 @@ async function fetchLiveData(mkt, strat) {
       }
     }
 
-    // Market indices via Yahoo Finance proxy
-    const indices = {
-      'NASDAQ': ['^IXIC','QQQ','AAPL','NVDA','MSFT','META','GOOGL','AMZN','TSLA','AMD'],
-      'S&P 500': ['^GSPC','SPY','AAPL','NVDA','MSFT','BRK-B','JPM','JNJ','V','PG'],
-      'NYSE': ['^NYA','KO','JPM','JNJ','XOM','CVX','BAC','WFC','GE','IBM'],
-      'Küresel': ['^GSPC','^IXIC','^DJI','^FTSE','^N225','GLD','TLT','DXY'],
-      'Global': ['^GSPC','^IXIC','^DJI','^FTSE','^N225','GLD','TLT'],
-      'AB': ['^STOXX50E','EZU','ASML','SAP','LVMH','SIE.DE','NESN.SW'],
-      'EU': ['^STOXX50E','EZU','ASML','SAP'],
-      'Japonya': ['^N225','EWJ','7203.T','6758.T','9984.T'],
-      'Japan': ['^N225','EWJ'],
-    };
-
-    const tickers = indices[mkt] || indices['S&P 500'];
-    const tickerStr = tickers.slice(0,5).join(',');
-    try {
-      const yUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickerStr}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketVolume,fiftyDayAverage,twoHundredDayAverage`;
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(yUrl)}`;
-      const yr = await fetch(proxy, {signal: AbortSignal.timeout(6000)});
-      if (yr.ok) {
-        const yd = await yr.json();
-        const quotes = yd?.quoteResponse?.result || [];
-        if (quotes.length > 0) {
-          let mktStr = `\n\n=== CANLI PİYASA VERİSİ (Yahoo Finance, ${new Date().toLocaleTimeString('tr-TR')}) ===\n`;
-          for (const q of quotes) {
-            const chg = q.regularMarketChangePercent?.toFixed(2);
-            const price = q.regularMarketPrice?.toLocaleString('tr-TR');
-            const ema50 = q.fiftyDayAverage ? ` | EMA50: ${q.fiftyDayAverage.toFixed(2)}` : '';
-            const ema200 = q.twoHundredDayAverage ? ` | EMA200: ${q.twoHundredDayAverage.toFixed(2)}` : '';
-            mktStr += `${q.symbol}: $${price} (${chg >= 0 ? '+' : ''}${chg}%)${ema50}${ema200}\n`;
-          }
-          data.prices.stocks = mktStr;
+    // Fetch stock prices
+    const symbols = indices[mkt] || indices['S&P 500'];
+    const r2 = await fetch(PROXY + '/stocks?symbols=' + symbols, {signal: AbortSignal.timeout(8000)});
+    if (r2.ok) {
+      const yd = await r2.json();
+      const quotes = yd?.quoteResponse?.result || [];
+      if (quotes.length > 0) {
+        let mktStr = `\n\n=== CANLI PİYASA VERİSİ (Yahoo Finance, ${new Date().toLocaleTimeString('tr-TR')}) ===\n`;
+        for (const q of quotes) {
+          const chg = q.regularMarketChangePercent?.toFixed(2);
+          const price = q.regularMarketPrice?.toLocaleString('en-US');
+          const ema50 = q.fiftyDayAverage ? ` | EMA50: ${q.fiftyDayAverage.toFixed(2)}` : '';
+          const ema200 = q.twoHundredDayAverage ? ` | EMA200: ${q.twoHundredDayAverage.toFixed(2)}` : '';
+          mktStr += `${q.symbol}: $${price} (${chg >= 0 ? '+' : ''}${chg}%)${ema50}${ema200}\n`;
         }
+        data.prices.stocks = mktStr;
       }
-    } catch(e) { /* Yahoo proxy failed, continue without */ }
+    }
 
-    // Fear & Greed index via alternative.me
-    try {
-      const fgr = await fetch('https://api.alternative.me/fng/?limit=1', {signal: AbortSignal.timeout(4000)});
-      if (fgr.ok) {
-        const fgd = await fgr.json();
-        const val = fgd?.data?.[0];
-        if (val) data.market.fearGreed = `\nKorku & Açgözlülük Endeksi: ${val.value} (${val.value_classification})`;
-      }
-    } catch(e) {}
+    // Fear & Greed
+    const r3 = await fetch(PROXY + '/feargreed', {signal: AbortSignal.timeout(5000)});
+    if (r3.ok) {
+      const fgd = await r3.json();
+      const val = fgd?.data?.[0];
+      if (val) data.market.fearGreed = `\nKorku & Açgözlülük Endeksi: ${val.value}/100 (${val.value_classification})`;
+    }
 
-  } catch(e) { /* live data unavailable */ }
+  } catch(e) { console.warn('Live data fetch failed:', e.message); }
   return data;
 }
 
