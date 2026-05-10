@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080810">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Trade Terminal">
+<title>AI Trading Research Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080810;--sf:#0e0e1a;--sf2:#141420;--sf3:#1a1a28;--sf4:#20202e;
+  --br:rgba(255,255,255,0.06);--brh:rgba(255,255,255,0.12);--bra:rgba(124,111,255,0.3);
+  --tx:#eeeef5;--tx2:#a0a0b8;--tx3:#6a6a82;
+  --ac:#7c6fff;--acg:#00d4aa;--acr:#ff5f5f;--acy:#ffb347;--acb:#5baeff;--acp:#c084fc;
+  --mn:'DM Mono',monospace;--dp:'Syne',sans-serif;
+  --r:8px;--r2:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font-family:var(--mn);font-size:13px;min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(124,111,255,0.07),transparent);pointer-events:none;z-index:0}
+
+/* Layout */
+.shell{position:relative;z-index:1;display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{background:rgba(8,8,16,0.95);border-bottom:1px solid var(--br);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--ac),#4f46e5);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.logo-text{font-family:var(--dp);font-size:15px;font-weight:800;letter-spacing:-0.02em}
+.logo-text span{color:var(--ac)}
+.logo-badge{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--tx3);border:1px solid var(--br);padding:2px 7px;border-radius:999px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);transition:all .3s;flex-shrink:0}
+.conn-dot.ok{background:var(--acg);box-shadow:0 0 8px rgba(0,212,170,.5)}
+.conn-dot.err{background:var(--acr)}
+.conn-label{font-size:11px;color:var(--tx3);letter-spacing:.05em}
+.conn-label.ok{color:var(--acg)}
+.ibtn{display:none;font-size:11px;padding:5px 11px;background:transparent;border:1px solid var(--acg);border-radius:var(--r);color:var(--acg);cursor:pointer;align-items:center;gap:5px;font-family:var(--mn);transition:all .15s}
+.ibtn.v{display:flex}
+.ibtn:hover{background:rgba(0,212,170,.1)}
+.lang-tog{display:flex;border:1px solid var(--br);border-radius:var(--r);overflow:hidden}
+.lbtn{font-family:var(--mn);font-size:10px;letter-spacing:.1em;padding:4px 10px;background:transparent;border:none;color:var(--tx3);cursor:pointer;transition:all .15s}
+.lbtn.on{background:var(--ac);color:#fff}
+
+/* Main */
+.main{display:grid;grid-template-columns:280px 1fr;gap:0;height:calc(100vh - 52px)}
+@media(max-width:768px){.main{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+
+/* Sidebar */
+.sidebar{background:var(--sf);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--br);border-radius:2px}
+
+.api-box{padding:14px 16px;border-bottom:1px solid var(--br)}
+.sec-lbl{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sec-lbl::before{content:'';width:3px;height:10px;background:var(--ac);border-radius:1px}
+.key-row{display:flex;gap:6px}
+.key-inp{flex:1;font-family:var(--mn);font-size:11px;padding:7px 10px;border:1px solid var(--br);border-radius:var(--r);background:var(--sf2);color:var(--tx);outline:none;transition:border-color .15s;min-width:0;letter-spacing:.03em}
+.key-inp:focus{border-color:var(--ac)}
+.key-btn{font-family:var(--mn);font-size:10px;padding:7px 11px;border:1px solid var(--br);border-radius:var(--r);background:transparent;color:var(--tx3);cursor:pointer;white-space:nowrap;transition:all .15s}
+.key-btn:hover{border-color:var(--ac);color:var(--ac)}
+.key-btn.ok{border-color:var(--acg)!important;color:var(--acg)!important}
+.key-hint{font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5}
+.key-hint a{color:var(--ac);text-decoration:none}
+.key-hint a:hover{text-decoration:underline}
+.ws-row{display:flex;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid var(--br)}
+.tswitch{position:relative;width:30px;height:16px;flex-shrink:0}
+.tswitch input{opacity:0;width:0;height:0}
+.tslider{position:absolute;inset:0;background:var(--sf3);border:1px solid var(--br);border-radius:8px;cursor:pointer;transition:all .2s}
+.tslider::before{content:'';position:absolute;width:10px;height:10px;left:2px;top:2px;background:var(--tx3);border-radius:50%;transition:all .2s}
+.tswitch input:checked+.tslider{background:rgba(124,111,255,.2);border-color:var(--ac)}
+.tswitch input:checked+.tslider::before{transform:translateX(14px);background:var(--ac)}
+.ws-lbl{font-size:10px;color:var(--tx3);letter-spacing:.04em}
+
+/* Strategy selector */
+.strat-box{padding:14px 16px;border-bottom:1px solid var(--br);flex:1}
+.strat-group{margin-bottom:14px}
+.strat-group:last-child{margin-bottom:0}
+.strat-title{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--tx3);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.strat-title::before{content:'';width:3px;height:10px;border-radius:1px}
+.strat-title.s-strat::before{background:var(--ac)}
+.strat-title.s-mkt::before{background:var(--acb)}
+.strat-title.s-risk::before{background:var(--acy)}
+.strat-title.s-tf::before{background:var(--acg)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--mn);font-size:10px;letter-spacing:.06em;padding:5px 10px;border-radius:999px;border:1px solid var(--br);background:transparent;color:var(--tx3);cursor:pointer;transition:all .15s;white-space:nowrap}
+.chip:hover{border-color:var(--brh);color:var(--tx2)}
+.chip.on{color:#fff;border-color:transparent}
+.chip.on.c-ac{background:var(--ac)}
+.chip.on.c-acb{background:var(--acb)}
+.chip.on.c-acg{background:rgba(0,212,170,.25);border-color:var(--acg);color:var(--acg)}
+.chip.on.c-acr{background:rgba(255,95,95,.2);border-color:var(--acr);color:var(--acr)}
+.chip.on.c-acy{background:rgba(255,179,71,.2);border-color:var(--acy);color:var(--acy)}
+
+.run-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;font-family:var(--dp);font-size:14px;font-weight:700;background:linear-gradient(135deg,var(--ac),#4f46e5);border:none;border-radius:var(--r);color:#fff;cursor:pointer;transition:all .2s;letter-spacing:-.01em;margin-top:14px}
+.run-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(124,111,255,.35)}
+.run-btn:active{transform:translateY(0)}
+.run-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.run-btn .spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Content panel */
+.content{background:var(--bg);overflow-y:auto;display:flex;flex-direction:column}
+.content::-webkit-scrollbar{width:5px}
+.content::-webkit-scrollbar-thumb{background:var(--br);border-radius:3px}
+
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px;text-align:center;gap:14px}
+.empty-icon{font-size:40px;opacity:.3}
+.empty-title{font-family:var(--dp);font-size:18px;font-weight:700;color:var(--tx2)}
+.empty-sub{font-size:12px;color:var(--tx3);line-height:1.7;max-width:280px}
+.empty-steps{display:flex;flex-direction:column;gap:8px;margin-top:6px;text-align:left;width:100%;max-width:260px}
+.step{display:flex;align-items:flex-start;gap:10px;font-size:11px;color:var(--tx3)}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--sf3);border:1px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:var(--ac)}
+
+/* Results */
+.results{padding:20px;display:flex;flex-direction:column;gap:14px}
+.res-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--br)}
+.res-title{font-family:var(--dp);font-size:16px;font-weight:800;letter-spacing:-.02em}
+.res-meta{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--tx3)}
+.res-time{display:flex;align-items:center;gap:5px}
+.risk-badge{font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:500}
+.rb-low{background:rgba(0,212,170,.15);color:var(--acg);border:1px solid rgba(0,212,170,.3)}
+.rb-mid{background:rgba(255,179,71,.15);color:var(--acy);border:1px solid rgba(255,179,71,.3)}
+.rb-high{background:rgba(255,95,95,.15);color:var(--acr);border:1px solid rgba(255,95,95,.3)}
+
+/* AI Response card */
+.ai-card{background:var(--sf);border:1px solid var(--br);border-radius:var(--r2);overflow:hidden}
+.ai-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--br);background:rgba(124,111,255,.04)}
+.ai-card-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ac);display:flex;align-items:center;gap:7px}
+.ai-card-actions{display:flex;gap:6px}
+.icon-btn{background:none;border:1px solid var(--br);border-radius:5px;color:var(--tx3);cursor:pointer;padding:4px 8px;font-size:11px;font-family:var(--mn);transition:all .15s;display:flex;align-items:center;gap:4px}
+.icon-btn:hover{border-color:var(--brh);color:var(--tx)}
+.ai-body{padding:16px;font-size:12px;line-height:1.85;color:var(--tx2)}
+
+/* Confidence meter */
+.conf-row{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--sf2);border-top:1px solid var(--br)}
+.conf-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);white-space:nowrap}
+.conf-bar{flex:1;height:4px;background:var(--sf3);border-radius:2px;overflow:hidden}
+.conf-fill{height:100%;border-radius:2px;transition:width .6s ease;background:linear-gradient(90deg,var(--acr),var(--acy),var(--acg))}
+.conf-val{font-size:11px;color:var(--tx2);white-space:nowrap;min-width:30px;text-align:right}
+
+/* Sources */
+.sources-row{padding:10px 16px;border-top:1px solid var(--br);display:flex;flex-wrap:wrap;gap:6px;background:var(--sf2)}
+.src-chip{font-size:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--br);color:var(--acg);text-decoration:none;transition:all .15s;letter-spacing:.03em}
+.src-chip:hover{border-color:var(--acg);background:rgba(0,212,170,.08)}
+
+/* Loading card */
+.loading-card{background:var(--sf);border:1px solid var(--bra);border-radius:var(--r2);padding:24px;display:flex;flex-direction:column;gap:14px}
+.loading-top{display:flex;align-items:center;gap:12px}
+.loading-spinner{width:28px;height:28px;border:2px solid var(--br);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.loading-text{font-family:var(--dp);font-size:15px;font-weight:700;color:var(--tx2)}
+.loading-sub{font-size:11px;color:var(--tx3)}
+.loading-steps{display:flex;flex-direction:column;gap:7px}
+.lstep{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--tx3);opacity:.4;transition:opacity .3s}
+.lstep.active{opacity:1;color:var(--tx2)}
+.lstep.done{opacity:.6;color:var(--acg)}
+.lstep-dot{width:6px;height:6px;border-radius:50%;background:var(--tx3);flex-shrink:0;transition:all .3s}
+.lstep.active .lstep-dot{background:var(--ac);box-shadow:0 0 6px rgba(124,111,255,.5)}
+.lstep.done .lstep-dot{background:var(--acg)}
+
+/* History strip */
+.history-strip{padding:14px 16px;border-bottom:1px solid var(--br)}
+.hist-items{display:flex;flex-direction:column;gap:4px;margin-top:7px}
+.hist-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.hist-item:hover{background:var(--sf2);border-color:var(--br)}
+.hist-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.hist-label{font-size:11px;color:var(--tx3);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-time{font-size:10px;color:var(--tx3);opacity:.5}
+
+/* Markdown rendered */
+.md h1{font-family:var(--dp);font-size:16px;font-weight:800;color:var(--tx);margin:14px 0 7px}
+.md h2{font-family:var(--dp);font-size:14px;font-weight:700;color:var(--tx);margin:12px 0 6px;padding-left:8px;border-left:2px solid var(--ac)}
+.md h3{font-size:12px;font-weight:500;color:var(--ac);margin:10px 0 5px;letter-spacing:.05em;text-transform:uppercase}
+.md p{margin-bottom:8px;color:var(--tx2)}
+.md strong{color:var(--tx);font-weight:500}
+.md em{color:var(--acy);font-style:normal}
+.md table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;border-radius:var(--r);overflow:hidden}
+.md th{background:var(--sf3);color:var(--ac);padding:7px 10px;text-align:left;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--br)}
+.md td{padding:6px 10px;border-bottom:1px solid var(--br);color:var(--tx2);vertical-align:top}
+.md tr:last-child td{border-bottom:none}
+.md tr:hover td{background:rgba(255,255,255,.02)}
+.md ul{padding-left:14px;margin:6px 0}
+.md li{margin:3px 0;color:var(--tx2)}
+.md code{background:var(--sf3);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--acp)}
+.md a{color:var(--acb);text-decoration:none}
+.md a:hover{text-decoration:underline}
+.md hr{border:none;border-top:1px solid var(--br);margin:12px 0}
+.md .tag-g{color:var(--acg)}
+.md .tag-r{color:var(--acr)}
+.md .tag-y{color:var(--acy)}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--sf2);border:1px solid var(--acg);color:var(--acg);font-family:var(--mn);font-size:12px;padding:10px 18px;border-radius:var(--r);opacity:0;transition:all .25s;z-index:999;pointer-events:none;transform:translateY(10px)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.err-t{border-color:var(--acr);color:var(--acr)}
+
+.ico{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--br);border-radius:3px}
+@media(max-width:768px){.sidebar{border-right:none;border-bottom:1px solid var(--br);max-height:none}.strat-box{overflow:visible}.main{height:auto}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <div>
+        <div class="logo-text">AI Trade <span>Terminal</span></div>
+      </div>
+      <div class="logo-badge">BETA</div>
+    </div>
+    <div class="topbar-right">
+      <div class="conn-dot" id="cdot"></div>
+      <span class="conn-label" id="clabel">Bağlantı yok</span>
+      <button class="ibtn" id="ibtn" onclick="installPWA()">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 2v13m0 0l-4-4m4 4l4-4M2 17v3a2 2 0 002 2h16a2 2 0 002-2v-3"/></svg>Yükle
+      </button>
+      <div class="lang-tog">
+        <button id="btn-tr" class="lbtn on" onclick="setLang('tr')">TR</button>
+        <button id="btn-en" class="lbtn" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- API Key -->
+      <div class="api-box">
+        <div class="sec-lbl">Groq API</div>
+        <div class="key-row">
+          <input class="key-inp" type="password" id="groqkey" placeholder="gsk_..." autocomplete="off" spellcheck="false" oninput="onKeyChange()">
+          <button class="key-btn" id="kbtn" onclick="saveKey()">Kaydet</button>
+        </div>
+        <div class="ws-row">
+          <label class="tswitch"><input type="checkbox" id="ws-tog" checked><span class="tslider"></span></label>
+          <span class="ws-lbl" id="wslbl">Google Search — canlı veri</span>
+        </div>
+        <div class="key-hint">Key: <a href="https://console.groq.com" target="_blank" target="_blank">console.groq.com</a> — ücretsiz, çok cömert kota</div>
+      </div>
+
+      <!-- Strategy Selector -->
+      <div class="strat-box">
+
+        <div class="strat-group">
+          <div class="strat-title s-strat" id="lbl-strat">STRATEJİ</div>
+          <div class="chips" id="chips-strat"></div>
+        </div>
+
+        <div class="strat-group">
+          <div class="strat-title s-mkt" id="lbl-mkt">PİYASA</div>
+          <div class="chips" id="chips-mkt"></div>
+        </div>
+
+        <div class="strat-group">
+          <div class="strat-title s-risk" id="lbl-risk">RİSK SEVİYESİ</div>
+          <div class="chips" id="chips-risk"></div>
+        </div>
+
+        <div class="strat-group">
+          <div class="strat-title s-tf" id="lbl-tf">ZAMAN DİLİMİ</div>
+          <div class="chips" id="chips-tf"></div>
+        </div>
+
+        <button class="run-btn" id="run-btn" onclick="runAnalysis()">
+          <svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="run-lbl">Analiz Başlat</span>
+        </button>
+      </div>
+
+      <!-- History -->
+      <div class="history-strip" id="hist-strip" style="display:none">
+        <div class="sec-lbl" id="lbl-hist">GEÇMİŞ</div>
+        <div class="hist-items" id="hist-items"></div>
+      </div>
+
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content" id="content">
+      <div class="empty" id="empty-state">
+        <div class="empty-icon">⚡</div>
+        <div class="empty-title" id="et-title">Terminal Hazır</div>
+        <div class="empty-sub" id="et-sub">Soldan strateji, piyasa ve risk seviyesi seç — AI otomatik analiz yapsın.</div>
+        <div class="empty-steps">
+          <div class="step"><div class="step-num">1</div><span id="es1">Groq API key gir ve kaydet</span></div>
+          <div class="step"><div class="step-num">2</div><span id="es2">Strateji + piyasa + risk seç</span></div>
+          <div class="step"><div class="step-num">3</div><span id="es3">Analiz Başlat'a bas — sonuç burada çıkar</span></div>
+        </div>
+      </div>
+      <div class="results" id="results" style="display:none"></div>
+    </div>
+
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const state = {
+  lang: 'tr',
+  apiKey: '',
+  webSearch: true,
+  sel: { strat: null, mkt: null, risk: null, tf: null },
+  history: [],
+  loading: false,
+};
+
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const CFG = {
+  strats: {
+    tr: ['Momentum','Değer Altı','Breakout','Gap Recovery','Earnings','Sektör Rotasyon','Opsiyon Flow','Kripto'],
+    en: ['Momentum','Undervalued','Breakout','Gap Recovery','Earnings','Sector Rotation','Options Flow','Crypto'],
+  },
+  mkts: {
+    tr: ['NASDAQ','S&P 500','NYSE','BIST','Kripto','AB','Japonya','Küresel'],
+    en: ['NASDAQ','S&P 500','NYSE','BIST','Crypto','EU','Japan','Global'],
+  },
+  risks: {
+    tr: ['Düşük','Orta','Yüksek'],
+    en: ['Low','Medium','High'],
+  },
+  tfs: {
+    tr: ['Skalp (1-15d)','Günlük','Swing (1-4h)','Pozisyon (g)'],
+    en: ['Scalp (1-15m)','Intraday','Swing (1-4h)','Position (d)'],
+  },
+  riskClass: ['rb-low','rb-mid','rb-high'],
+  riskColors: ['acg','acy','acr'],
+  stratColors: ['ac','ac','ac','ac','acy','acb','acp','acg'],
+};
+
+const T = {
+  tr: {
+    connOk:'Groq bağlı',connNo:'Bağlantı yok',connErr:'Bağlantı hatası',
+    save:'Kaydet',saved:'✓ Kaydedildi',
+    run:'Analiz Başlat',running:'Analiz Ediliyor...',
+    copy:'Kopyala',copied:'✓ Kopyalandı',newAn:'Yeni Analiz',
+    lStrat:'STRATEJİ',lMkt:'PİYASA',lRisk:'RİSK SEVİYESİ',lTf:'ZAMAN DİLİMİ',
+    lHist:'GEÇMİŞ',wslbl:'Google Search — canlı veri',
+    etTitle:'Terminal Hazır',etSub:'Soldan strateji, piyasa ve risk seviyesi seç — AI otomatik analiz yapsın.',
+    es1:'Groq API key gir ve kaydet',es2:'Strateji + piyasa + risk seç',es3:'Analiz Başlat\'a bas — sonuç burada çıkar',
+    ls1:'Canlı piyasa verisi çekiliyor...',ls2:'Yahoo Finance & CoinGecko sorgulanıyor...',ls3:'AI analiz yapıyor...',ls4:'Sonuçlar hazırlanıyor...',
+    aiTitle:'AI ANALİZ RAPORU',confLabel:'AI Güveni',srcLabel:'KAYNAKLAR',
+    selErr:'Lütfen strateji ve piyasa seç!',keyErr:'Önce Groq API key gir!',
+    noResult:'Sonuç alınamadı. Tekrar dene.',
+  },
+  en: {
+    connOk:'Groq connected',connNo:'No connection',connErr:'Connection error',
+    save:'Save',saved:'✓ Saved',
+    run:'Run Analysis',running:'Analyzing...',
+    copy:'Copy',copied:'✓ Copied',newAn:'New Analysis',
+    lStrat:'STRATEGY',lMkt:'MARKET',lRisk:'RISK LEVEL',lTf:'TIMEFRAME',
+    lHist:'HISTORY',wslbl:'Google Search — live data',
+    etTitle:'Terminal Ready',etSub:'Select strategy, market and risk level on the left — AI will analyze automatically.',
+    es1:'Enter & save your Groq API key',es2:'Pick strategy + market + risk',es3:'Hit Run Analysis — results appear here',
+    ls1:'Fetching live market data...',ls2:'Querying Yahoo Finance & CoinGecko...',ls3:'AI running analysis...',ls4:'Preparing results...',
+    aiTitle:'AI ANALYSIS REPORT',confLabel:'AI Confidence',srcLabel:'SOURCES',
+    selErr:'Please select strategy and market!',keyErr:'Enter Groq API key first!',
+    noResult:'No result received. Please try again.',
+  }
+};
+
+function t(k){ return T[state.lang][k] || k; }
+
+// ─── INSTITUTIONAL PROMPTS ────────────────────────────────────────────────────
+function buildPrompt(){
+  const s = state.sel;
+  const strat = CFG.strats[state.lang][CFG.strats.tr.indexOf(CFG.strats.tr[CFG.strats[state.lang].indexOf(s.strat)])];
+  const stratIdx = CFG.strats[state.lang].indexOf(s.strat);
+  const mkt = s.mkt; const risk = s.risk; const tf = s.tf;
+  const date = new Date().toLocaleDateString(state.lang==='tr'?'tr-TR':'en-US');
+
+  const sysTR = `Sen kurumsal düzeyde bir finansal analist ve portföy yöneticisisin. Bugünün tarihi: ${date}. Analizin profesyonel, yapılandırılmış ve somut olmalı. Tablo kullan, net giriş/stop/hedef ver. Türkçe yaz.`;
+  const sysEN = `You are an institutional-grade financial analyst and portfolio manager. Today is ${date}. Your analysis must be professional, structured and concrete. Use tables, give clear entry/stop/target levels. Write in English.`;
+
+  const prompts = {
+    tr: [
+      // 0 Momentum
+      `${sysTR}\n\n${mkt} piyasasında BUGÜN momentum gösteren hisseleri analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nŞunları dahil et:\n- Relative Strength analizi (sektör vs piyasa)\n- Volume Profile: ADTV'nin kaç katı işlem gördü\n- Market Breadth: yükselen/düşen hisse oranı\n- Volatility Regime: VIX/korku endeksi durumu\n- Risk-on/Risk-off sinyali\n\nTablo formatında 7 hisse sun: Ticker | Fiyat | RS Skoru | Hacim çarpanı | Momentum nedeni | Giriş | Stop | TP1 | TP2 | Risk/Ödül | Güven(1-10)\n\nSon olarak: genel piyasa yorumu ve bu momentumun sürdürülebilirliği.`,
+      // 1 Değer Altı
+      `${sysTR}\n\n${mkt} piyasasında değerinin altında kalan fırsatları institutional perspektifle analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nAnaliz kriterleri:\n- DCF bazlı içsel değer hesabı\n- EV/EBITDA, P/FCF, P/S oranları\n- Insider alımları ve kurumsal sahiplik değişimi\n- Short interest oranı\n- Catalyst timeline (yaklaşan katalizörler)\n\n8 hisse tablo: Ticker | Fiyat | İçsel Değer | Upside% | EV/EBITDA | Short% | Katalizör | Risk | Pozisyon önerisi\n\nGenel macro görünüm ve value trap riskleri.`,
+      // 2 Breakout
+      `${sysTR}\n\n${mkt} piyasasında bugün breakout yaşayan veya yakın breakout beklenen hisseleri analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nDahil et:\n- Liquidity Sweep analizi (stop hunt tuzakları)\n- Volume at Price (VAP) profili\n- Order Flow imbalance\n- Options Call/Put pozisyonları\n- Gamma Exposure seviyesi\n\n6 hisse tablo: Ticker | Fiyat | Kırılan seviye | Hacim teyidi | Gamma seviyesi | Giriş kuralı | SL | TP1 | TP2 | Yanlış kırılma riski\n\nPiyasa genelinde breakout ortamı değerlendirmesi.`,
+      // 3 Gap Recovery
+      `${sysTR}\n\n${mkt} piyasasında son 7 günde ciddi gap-down yaşayan ama toparlanma sinyali veren hisseleri bul. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nAnaliz et:\n- Gap nedeni (earnings miss, haber, sektör)\n- Dark Pool aktivitesi (kurumsal alım var mı?)\n- Retail vs institutional sentiment farkı\n- Options Put/Call oranı değişimi\n- Mean reversion olasılığı (istatistiksel)\n\n6 hisse tablo: Ticker | Gap% | Gap nedeni | DP sinyali | Put/Call | Toparlanma ihtimali | Giriş planı | Stop | Hedef\n\nGenel mean-reversion ortamı değerlendirmesi.`,
+      // 4 Earnings
+      `${sysTR}\n\nGelecek 2 haftada ${mkt} piyasasında earnings açıklayacak ve trade fırsatı sunan hisseleri analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nDahil et:\n- IV Rank ve IV Percentile\n- Historical earnings move ortalaması\n- Beklenti vs gerçek tahmin farkı\n- Options chain yapısı (straddle maliyet vs beklenen hareket)\n- Analyst revision trendi\n\n7 hisse tablo: Ticker | Earnings tarihi | IV Rank | Hist.move% | Straddle maliyet | Önerilen strateji | Giriş | Max loss | Hedef\n\nEarnings sezonu genel değerlendirmesi.`,
+      // 5 Sektör Rotasyon
+      `${sysTR}\n\n${mkt} piyasasında son 30 günde sektör rotasyonunu analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nDahil et:\n- Sektör bazlı fon akışı (son 4 hafta)\n- Relative Rotation Graph pozisyonu\n- Macro calendar etkisi (FED, enflasyon, büyüme)\n- Risk-on/Risk-off geçişleri\n- Leading vs lagging sektörler\n\n6 ETF/sektör tablo: ETF | Sektör | 4h flow | RRG pozisyonu | Macro katalizör | Zaman dilimi | Giriş | Stop | Potansiyel\n\nSonraki 30 günün sektör stratejisi.`,
+      // 6 Options Flow
+      `${sysTR}\n\nBugün ${mkt} piyasasında unusual options activity gösteren hisseleri analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nDahil et:\n- Dark Pool print tespiti\n- Unusual Call/Put sweep'leri\n- Gamma Squeeze potansiyeli\n- Max Pain seviyesi\n- Dealer hedging baskısı\n- IV skew analizi\n\n6 ticker tablo: Ticker | Anormal aktivite | Call/Put yönü | Strike/Vade | IV Rank | Gamma exposure | Max Pain | Trade fikri | Risk\n\nGenel options market sentiment.`,
+      // 7 Kripto
+      `${sysTR}\n\n${mkt==='Kripto'?'Kripto':mkt+' piyasası kripto'} segmentinde değer fırsatlarını analiz et. Risk: ${risk}. Zaman dilimi: ${tf}.\n\nDahil et:\n- On-chain metrikler (NVT, MVRV, Realized Cap)\n- Exchange flow (giriş/çıkış)\n- Whale aktivitesi\n- DeFi TVL değişimi\n- Funding rate ve OI analizi\n- Macro korelasyon (BTC dominance, DXY)\n\n7 kripto tablo: Coin | Fiyat | MVRV | Exchange flow | Whale sinyal | Funding | Destek | Direnç | Trade planı\n\nGenel kripto market cycle değerlendirmesi.`,
+    ],
+    en: [
+      `${sysEN}\n\nAnalyze stocks showing momentum TODAY in the ${mkt} market. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- Relative Strength vs sector and market\n- Volume Profile: multiple of ADTV\n- Market Breadth: advance/decline ratio\n- Volatility Regime: VIX/fear index status\n- Risk-on/Risk-off signal\n\nPresent 7 stocks in table: Ticker | Price | RS Score | Vol multiplier | Momentum reason | Entry | Stop | TP1 | TP2 | R/R | Confidence(1-10)\n\nFinally: overall market commentary and momentum sustainability.`,
+      `${sysEN}\n\nAnalyze undervalued opportunities in ${mkt} from an institutional perspective. Risk: ${risk}. Timeframe: ${tf}.\n\nCriteria:\n- DCF-based intrinsic value\n- EV/EBITDA, P/FCF, P/S ratios\n- Insider buying and institutional ownership changes\n- Short interest ratio\n- Catalyst timeline\n\n8 stocks table: Ticker | Price | Intrinsic Value | Upside% | EV/EBITDA | Short% | Catalyst | Risk | Position suggestion\n\nMacro outlook and value trap risks.`,
+      `${sysEN}\n\nAnalyze stocks breaking out or near breakout in ${mkt} today. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- Liquidity Sweep analysis (stop hunts)\n- Volume at Price (VAP) profile\n- Order Flow imbalance\n- Options Call/Put positioning\n- Gamma Exposure levels\n\n6 stocks table: Ticker | Price | Level broken | Volume confirmation | Gamma level | Entry rule | SL | TP1 | TP2 | False breakout risk\n\nOverall breakout environment assessment.`,
+      `${sysEN}\n\nFind stocks in ${mkt} that gapped down significantly in the last 7 days but show recovery signals. Risk: ${risk}. Timeframe: ${tf}.\n\nAnalyze:\n- Gap reason (earnings miss, news, sector)\n- Dark Pool activity (institutional buying?)\n- Retail vs institutional sentiment divergence\n- Options Put/Call ratio change\n- Statistical mean reversion probability\n\n6 stocks table: Ticker | Gap% | Gap reason | DP signal | Put/Call | Recovery probability | Entry plan | Stop | Target`,
+      `${sysEN}\n\nAnalyze stocks reporting earnings in the next 2 weeks in ${mkt} offering trading opportunities. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- IV Rank and IV Percentile\n- Historical earnings move average\n- Expectation vs estimate gap\n- Options chain structure (straddle cost vs expected move)\n- Analyst revision trend\n\n7 stocks table: Ticker | Earnings date | IV Rank | Hist.move% | Straddle cost | Suggested strategy | Entry | Max loss | Target`,
+      `${sysEN}\n\nAnalyze sector rotation in ${mkt} over the last 30 days. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- Sector fund flows (last 4 weeks)\n- Relative Rotation Graph position\n- Macro calendar impact (FED, inflation, growth)\n- Risk-on/Risk-off transitions\n- Leading vs lagging sectors\n\n6 ETF/sector table: ETF | Sector | 4w flow | RRG position | Macro catalyst | Timeframe | Entry | Stop | Potential`,
+      `${sysEN}\n\nAnalyze stocks showing unusual options activity in ${mkt} today. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- Dark Pool print detection\n- Unusual Call/Put sweeps\n- Gamma Squeeze potential\n- Max Pain level\n- Dealer hedging pressure\n- IV skew analysis\n\n6 tickers table: Ticker | Unusual activity | Call/Put direction | Strike/Expiry | IV Rank | Gamma exposure | Max Pain | Trade idea | Risk`,
+      `${sysEN}\n\nAnalyze crypto opportunities in ${mkt==='Crypto'?'the crypto':'the '+mkt} segment. Risk: ${risk}. Timeframe: ${tf}.\n\nInclude:\n- On-chain metrics (NVT, MVRV, Realized Cap)\n- Exchange flows (inflow/outflow)\n- Whale activity\n- DeFi TVL changes\n- Funding rate and OI analysis\n- Macro correlation (BTC dominance, DXY)\n\n7 crypto table: Coin | Price | MVRV | Exchange flow | Whale signal | Funding | Support | Resistance | Trade plan`,
+    ]
+  };
+
+  const idx = CFG.strats[state.lang].indexOf(s.strat);
+  return prompts[state.lang][idx] || prompts[state.lang][0];
+}
+
+// ─── CHIP BUILDER ─────────────────────────────────────────────────────────────
+function buildChips(containerId, items, key, colorClass){
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  items.forEach((item, i) => {
+    const b = document.createElement('button');
+    b.className = 'chip'+(state.sel[key]===item?' on c-'+colorClass:'');
+    b.textContent = item;
+    b.onclick = () => {
+      state.sel[key] = state.sel[key]===item ? null : item;
+      buildChips(containerId, items, key, colorClass);
+    };
+    c.appendChild(b);
+  });
+}
+
+function buildAllChips(){
+  buildChips('chips-strat', CFG.strats[state.lang], 'strat', 'ac');
+  buildChips('chips-mkt', CFG.mkts[state.lang], 'mkt', 'acb');
+  buildChips('chips-risk', CFG.risks[state.lang], 'risk', state.sel.risk===CFG.risks[state.lang][0]?'acg':state.sel.risk===CFG.risks[state.lang][2]?'acr':'acy');
+  buildChips('chips-tf', CFG.tfs[state.lang], 'tf', 'acg');
+  // re-do risk with correct color per item
+  const rc = document.getElementById('chips-risk');
+  rc.innerHTML='';
+  CFG.risks[state.lang].forEach((item,i)=>{
+    const cls=['acg','acy','acr'][i];
+    const b=document.createElement('button');
+    b.className='chip'+(state.sel.risk===item?' on c-'+cls:'');
+    b.textContent=item;
+    b.onclick=()=>{state.sel.risk=state.sel.risk===item?null:item;buildAllChips()};
+    rc.appendChild(b);
+  });
+}
+
+// ─── LABELS ──────────────────────────────────────────────────────────────────
+function updateLabels(){
+  document.getElementById('lbl-strat').textContent=t('lStrat');
+  document.getElementById('lbl-mkt').textContent=t('lMkt');
+  document.getElementById('lbl-risk').textContent=t('lRisk');
+  document.getElementById('lbl-tf').textContent=t('lTf');
+  document.getElementById('lbl-hist').textContent=t('lHist');
+  document.getElementById('wslbl').textContent=t('wslbl');
+  document.getElementById('et-title').textContent=t('etTitle');
+  document.getElementById('et-sub').textContent=t('etSub');
+  document.getElementById('es1').textContent=t('es1');
+  document.getElementById('es2').textContent=t('es2');
+  document.getElementById('es3').textContent=t('es3');
+  document.getElementById('run-lbl').textContent=state.loading?t('running'):t('run');
+  document.getElementById('clabel').textContent=state.apiKey?t('connOk'):t('connNo');
+}
+
+// ─── LIVE DATA FETCHER ───────────────────────────────────────────────────────
+async function fetchLiveData(mkt, strat) {
+  const data = { prices: {}, market: {} };
+  try {
+    // Crypto prices via CoinGecko (no CORS, no key needed)
+    const isCrypto = mkt === 'Kripto' || mkt === 'Crypto' || strat === 'Kripto' || strat === 'Crypto';
+    if (isCrypto) {
+      const coins = 'bitcoin,ethereum,solana,binancecoin,ripple,cardano,avalanche-2,chainlink,polkadot,matic-network';
+      const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`);
+      if (r.ok) {
+        const d = await r.json();
+        const map = {bitcoin:'BTC',ethereum:'ETH',solana:'SOL',binancecoin:'BNB',ripple:'XRP',cardano:'ADA','avalanche-2':'AVAX',chainlink:'LINK',polkadot:'DOT','matic-network':'MATIC'};
+        let priceStr = '\n\n=== GÜNCEL KRİPTO FİYATLARI (CoinGecko, canlı) ===\n';
+        for (const [id, sym] of Object.entries(map)) {
+          if (d[id]) {
+            priceStr += `${sym}: $${d[id].usd.toLocaleString()} (24s: ${d[id].usd_24h_change?.toFixed(2)}%)\n`;
+          }
+        }
+        data.prices.crypto = priceStr;
+      }
+    }
+
+    // Market indices via Yahoo Finance proxy
+    const indices = {
+      'NASDAQ': ['^IXIC','QQQ','AAPL','NVDA','MSFT','META','GOOGL','AMZN','TSLA','AMD'],
+      'S&P 500': ['^GSPC','SPY','AAPL','NVDA','MSFT','BRK-B','JPM','JNJ','V','PG'],
+      'NYSE': ['^NYA','KO','JPM','JNJ','XOM','CVX','BAC','WFC','GE','IBM'],
+      'Küresel': ['^GSPC','^IXIC','^DJI','^FTSE','^N225','GLD','TLT','DXY'],
+      'Global': ['^GSPC','^IXIC','^DJI','^FTSE','^N225','GLD','TLT'],
+      'AB': ['^STOXX50E','EZU','ASML','SAP','LVMH','SIE.DE','NESN.SW'],
+      'EU': ['^STOXX50E','EZU','ASML','SAP'],
+      'Japonya': ['^N225','EWJ','7203.T','6758.T','9984.T'],
+      'Japan': ['^N225','EWJ'],
+    };
+
+    const tickers = indices[mkt] || indices['S&P 500'];
+    const tickerStr = tickers.slice(0,5).join(',');
+    try {
+      const yUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickerStr}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketVolume,fiftyDayAverage,twoHundredDayAverage`;
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(yUrl)}`;
+      const yr = await fetch(proxy, {signal: AbortSignal.timeout(6000)});
+      if (yr.ok) {
+        const yd = await yr.json();
+        const quotes = yd?.quoteResponse?.result || [];
+        if (quotes.length > 0) {
+          let mktStr = `\n\n=== CANLI PİYASA VERİSİ (Yahoo Finance, ${new Date().toLocaleTimeString('tr-TR')}) ===\n`;
+          for (const q of quotes) {
+            const chg = q.regularMarketChangePercent?.toFixed(2);
+            const price = q.regularMarketPrice?.toLocaleString('tr-TR');
+            const ema50 = q.fiftyDayAverage ? ` | EMA50: ${q.fiftyDayAverage.toFixed(2)}` : '';
+            const ema200 = q.twoHundredDayAverage ? ` | EMA200: ${q.twoHundredDayAverage.toFixed(2)}` : '';
+            mktStr += `${q.symbol}: $${price} (${chg >= 0 ? '+' : ''}${chg}%)${ema50}${ema200}\n`;
+          }
+          data.prices.stocks = mktStr;
+        }
+      }
+    } catch(e) { /* Yahoo proxy failed, continue without */ }
+
+    // Fear & Greed index via alternative.me
+    try {
+      const fgr = await fetch('https://api.alternative.me/fng/?limit=1', {signal: AbortSignal.timeout(4000)});
+      if (fgr.ok) {
+        const fgd = await fgr.json();
+        const val = fgd?.data?.[0];
+        if (val) data.market.fearGreed = `\nKorku & Açgözlülük Endeksi: ${val.value} (${val.value_classification})`;
+      }
+    } catch(e) {}
+
+  } catch(e) { /* live data unavailable */ }
+  return data;
+}
+
+// ─── ANALYSIS ─────────────────────────────────────────────────────────────────
+async function runAnalysis(){
+  if(!state.apiKey){ toast(t('keyErr'), true); document.getElementById('groqkey').focus(); return; }
+  if(!state.sel.strat||!state.sel.mkt){ toast(t('selErr'), true); return; }
+
+  state.loading = true;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="ico spin" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span>${t('running')}</span>`;
+
+  showResults();
+  showLoading();
+
+  try {
+    setLoadStep(0);
+    // Fetch live market data first
+    const liveData = await fetchLiveData(state.sel.mkt, state.sel.strat);
+
+    let prompt = buildPrompt();
+
+    // Inject live prices into prompt
+    if (liveData.prices.crypto) prompt += liveData.prices.crypto;
+    if (liveData.prices.stocks) prompt += liveData.prices.stocks;
+    if (liveData.market.fearGreed) prompt += liveData.market.fearGreed;
+
+    if (liveData.prices.crypto || liveData.prices.stocks) {
+      prompt += '\n\nÖNEMLİ: Yukarıdaki CANLI fiyat verilerini kullan. Bu fiyatlar gerçek zamanlıdır. Analiz tablolarında bu fiyatları baz al.';
+    }
+
+    const useWS = state.webSearch;
+
+    const sysmsg = state.lang==='tr'
+      ? 'Sen kurumsal düzeyde bir finansal analist ve portföy yöneticisisin. Analizin profesyonel, yapılandırılmış ve somut olmalı. Markdown tablo kullan, net giriş/stop/hedef ver. Türkçe yaz.'
+      : 'You are an institutional-grade financial analyst. Analysis must be professional, structured and concrete. Use markdown tables, give clear entry/stop/target. Write in English.';
+
+    const body = {
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: sysmsg },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.65,
+      max_tokens: 3000,
+    };
+
+    setLoadStep(1);
+    await delay(400);
+    setLoadStep(2);
+
+    const res = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+state.apiKey}, body:JSON.stringify(body)}
+    );
+
+    if(!res.ok){
+      const e=await res.json().catch(()=>({}));
+      throw new Error(e?.error?.message||'HTTP '+res.status);
+    }
+
+    setLoadStep(3);
+    const data = await res.json();
+    await delay(300);
+    setLoadStep(4);
+    await delay(200);
+
+    const text = data?.choices?.[0]?.message?.content||'';
+    const chunks = [];
+    const confidence = estimateConfidence(text, 2);
+
+    if(!text) throw new Error(t('noResult'));
+
+    addToHistory(state.sel.strat, state.sel.mkt, state.sel.risk);
+    renderResult(text, chunks, confidence);
+    setConn('ok');
+
+  } catch(e){
+    renderError(e.message);
+    setConn('err');
+  }
+
+  state.loading = false;
+  btn.disabled = false;
+  btn.innerHTML = `<svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg><span id="run-lbl">${t('run')}</span>`;
+}
+
+function estimateConfidence(text, sourceCount){
+  let score = 50;
+  if(sourceCount>0) score+=20;
+  if(sourceCount>3) score+=10;
+  if(text.includes('|')) score+=10; // has table
+  if(text.length>1000) score+=5;
+  if(text.length>2000) score+=5;
+  return Math.min(score, 97);
+}
+
+function showLoading(){
+  const r = document.getElementById('results');
+  const steps = [t('ls1'),t('ls2'),t('ls3'),t('ls4')];
+  r.innerHTML = `<div class="loading-card">
+    <div class="loading-top">
+      <div class="loading-spinner"></div>
+      <div><div class="loading-text">${t('running')}</div><div class="loading-sub">${state.sel.strat} · ${state.sel.mkt}</div></div>
+    </div>
+    <div class="loading-steps">
+      ${steps.map((s,i)=>`<div class="lstep" id="ls${i}"><div class="lstep-dot"></div>${s}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function setLoadStep(n){
+  for(let i=0;i<4;i++){
+    const el=document.getElementById('ls'+i);
+    if(!el)continue;
+    if(i<n) el.className='lstep done';
+    else if(i===n) el.className='lstep active';
+    else el.className='lstep';
+  }
+}
+
+function renderResult(text, chunks, conf){
+  const riskBadgeClass = ['rb-low','rb-mid','rb-high'][CFG.risks[state.lang].indexOf(state.sel.risk)]||'rb-mid';
+  const now = new Date().toLocaleTimeString(state.lang==='tr'?'tr-TR':'en-US',{hour:'2-digit',minute:'2-digit'});
+
+  const srcHTML = chunks.length>0
+    ? `<div class="sources-row"><span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-right:6px">${t('srcLabel')}</span>
+       ${chunks.slice(0,6).map(c=>`<a class="src-chip" href="${esc(c.web?.uri||'#')}" target="_blank" rel="noopener">${esc(c.web?.title?.slice(0,35)||'Kaynak')}…</a>`).join('')}
+       </div>` : '';
+
+  const r = document.getElementById('results');
+  r.innerHTML = `
+    <div class="res-header">
+      <div class="res-title">${esc(state.sel.strat)} <span style="color:var(--tx3);font-weight:400">/ ${esc(state.sel.mkt)}</span></div>
+      <div class="res-meta">
+        <span class="risk-badge ${riskBadgeClass}">${esc(state.sel.risk||'—')}</span>
+        <span class="res-time"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>${now}</span>
+        <button class="icon-btn" onclick="runAnalysis()" title="Yenile">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="ai-card">
+      <div class="ai-card-head">
+        <div class="ai-card-title">
+          <svg class="ico" viewBox="0 0 24 24" style="color:var(--ac)"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          ${t('aiTitle')}
+        </div>
+        <div class="ai-card-actions">
+          <button class="icon-btn" id="cp-main" onclick="copyResult()">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            ${t('copy')}
+          </button>
+        </div>
+      </div>
+      <div class="ai-body md" id="ai-body">${renderMD(text)}</div>
+      <div class="conf-row">
+        <span class="conf-label">${t('confLabel')}</span>
+        <div class="conf-bar"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+        <span class="conf-val" id="conf-val">—</span>
+      </div>
+      ${srcHTML}
+    </div>`;
+
+  setTimeout(()=>{
+    const fill=document.getElementById('conf-fill');
+    const val=document.getElementById('conf-val');
+    if(fill){fill.style.width=conf+'%'}
+    if(val){val.textContent=conf+'%'}
+  },100);
+}
+
+function renderError(msg){
+  document.getElementById('results').innerHTML=`
+    <div class="ai-card" style="border-color:rgba(255,95,95,.3)">
+      <div class="ai-card-head" style="background:rgba(255,95,95,.05)">
+        <div class="ai-card-title" style="color:var(--acr)">⚠ HATA</div>
+      </div>
+      <div class="ai-body"><p style="color:var(--acr)">${esc(msg)}</p>
+        <p style="margin-top:8px;color:var(--tx3);font-size:11px">API key'ini kontrol et veya tekrar dene.</p>
+      </div>
+    </div>`;
+}
+
+// ─── MARKDOWN RENDERER ────────────────────────────────────────────────────────
+function renderMD(raw){
+  const lines = esc(raw).split('\n');
+  let out = '', inTable = false, inList = false;
+  for(let i=0;i<lines.length;i++){
+    let l = lines[i];
+    // headings
+    if(l.startsWith('### '))     { if(inList){out+='</ul>';inList=false;} out+=`<h3>${l.slice(4)}</h3>`; continue; }
+    if(l.startsWith('## '))      { if(inList){out+='</ul>';inList=false;} out+=`<h2>${l.slice(3)}</h2>`; continue; }
+    if(l.startsWith('# '))       { if(inList){out+='</ul>';inList=false;} out+=`<h1>${l.slice(2)}</h1>`; continue; }
+    // table
+    if(l.startsWith('|')){
+      if(!inTable){out+='<table>';inTable=true;}
+      const cells=l.split('|').filter((_,i,a)=>i>0&&i<a.length-1).map(c=>c.trim());
+      const isSep=cells.every(c=>/^[-:]+$/.test(c));
+      if(isSep) continue;
+      const isHead=(i===0||lines[i-1].startsWith('# ')||lines[i-1].startsWith('## ')||lines[i-1].startsWith('### ')||!lines[i-1].startsWith('|'));
+      const tag=(!inTable||isHead)?'th':'td';
+      out+=`<tr>${cells.map(c=>`<${tag}>${inlineStyle(c)}</${tag}>`).join('')}</tr>`;
+      continue;
+    } else if(inTable){ out+='</table>'; inTable=false; }
+    // list
+    if(l.match(/^- /)||l.match(/^\* /)){
+      if(!inList){out+='<ul>';inList=true;}
+      out+=`<li>${inlineStyle(l.replace(/^[-*] /,''))}</li>`;
+      continue;
+    } else if(inList){ out+='</ul>';inList=false; }
+    // hr
+    if(l.match(/^---+$/)){ out+='<hr>'; continue; }
+    // blank
+    if(l.trim()===''){out+='<br>';continue;}
+    // paragraph
+    out+=`<p>${inlineStyle(l)}</p>`;
+  }
+  if(inTable) out+='</table>';
+  if(inList) out+='</ul>';
+  return out;
+}
+
+function inlineStyle(t){
+  return t
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(\+\d+\.?\d*%)/g,'<span class="tag-g">$1</span>')
+    .replace(/(-\d+\.?\d*%)/g,'<span class="tag-r">$1</span>');
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── HISTORY ──────────────────────────────────────────────────────────────────
+function addToHistory(strat, mkt, risk){
+  const item={strat,mkt,risk,time:new Date().toLocaleTimeString(state.lang==='tr'?'tr-TR':'en-US',{hour:'2-digit',minute:'2-digit'})};
+  state.history.unshift(item);
+  if(state.history.length>8) state.history.pop();
+  renderHistory();
+}
+
+function renderHistory(){
+  const strip=document.getElementById('hist-strip');
+  const items=document.getElementById('hist-items');
+  if(!state.history.length){strip.style.display='none';return;}
+  strip.style.display='block';
+  const colors={Momentum:'#7c6fff','Değer Altı':'#7c6fff',Breakout:'#ff6b6b','Gap Recovery':'#ff6b6b',Earnings:'#ffb347','Sektör Rotasyon':'#5baeff','Options Flow':'#c084fc',Kripto:'#00d4aa',Undervalued:'#7c6fff','Sector Rotation':'#5baeff',Crypto:'#00d4aa'};
+  items.innerHTML=state.history.map((h,i)=>`
+    <div class="hist-item" onclick="rerunHistory(${i})">
+      <div class="hist-dot" style="background:${colors[h.strat]||'#7c6fff'}"></div>
+      <span class="hist-label">${esc(h.strat)} · ${esc(h.mkt)}</span>
+      <span class="hist-time">${h.time}</span>
+    </div>`).join('');
+}
+
+function rerunHistory(i){
+  const h=state.history[i];
+  const si=CFG.strats[state.lang].indexOf(h.strat);
+  const mi=CFG.mkts[state.lang].indexOf(h.mkt);
+  if(si>-1) state.sel.strat=h.strat;
+  if(mi>-1) state.sel.mkt=h.mkt;
+  state.sel.risk=h.risk;
+  buildAllChips();
+  runAnalysis();
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────────────
+function showResults(){
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('results').style.display='flex';
+}
+
+function setConn(status){
+  const dot=document.getElementById('cdot');
+  const lbl=document.getElementById('clabel');
+  dot.className='conn-dot'+(status?' '+status:'');
+  lbl.className='conn-label'+(status?' '+status:'');
+  lbl.textContent=status==='ok'?t('connOk'):status==='err'?t('connErr'):t('connNo');
+}
+
+function copyResult(){
+  const el=document.getElementById('ai-body');
+  if(!el)return;
+  navigator.clipboard.writeText(el.innerText).then(()=>{
+    const btn=document.getElementById('cp-main');
+    if(btn){btn.innerHTML=`<svg class="ico" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>${t('copied')}`;setTimeout(()=>{btn.innerHTML=`<svg class="ico" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>${t('copy')}`},2000);}
+    toast(t('copied'));
+  });
+}
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function toast(msg, isErr=false){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast'+(isErr?' err-t':'')+' show';
+  setTimeout(()=>el.className='toast'+(isErr?' err-t':''),2800);
+}
+
+// ─── KEY / SETTINGS ──────────────────────────────────────────────────────────
+function saveKey(){
+  const v=document.getElementById('groqkey').value.trim();
+  if(!v){toast(t('keyErr'),true);return;}
+  state.apiKey=v;
+  try{localStorage.setItem('aitt_groqkey',v);}catch(e){}
+  const btn=document.getElementById('kbtn');
+  btn.textContent=t('saved');btn.classList.add('ok');
+  setTimeout(()=>{btn.textContent=t('save');btn.classList.remove('ok');},2500);
+  setConn('ok');
+}
+
+function onKeyChange(){
+  const v=document.getElementById('groqkey').value.trim();
+  if(!v){state.apiKey='';setConn('');}
+}
+
+document.getElementById('ws-tog').addEventListener('change',e=>{ state.webSearch=e.target.checked; });
+
+// ─── LANG ─────────────────────────────────────────────────────────────────────
+function setLang(l){
+  state.lang=l;
+  document.getElementById('btn-tr').className='lbtn'+(l==='tr'?' on':'');
+  document.getElementById('btn-en').className='lbtn'+(l==='en'?' on':'');
+  // reset selections to avoid index mismatch
+  state.sel={strat:null,mkt:null,risk:null,tf:null};
+  buildAllChips();
+  updateLabels();
+}
+
+// ─── PWA ──────────────────────────────────────────────────────────────────────
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('ibtn').classList.add('v');});
+function installPWA(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('ibtn').classList.remove('v');});}}
+
+// manifest
+const mf={name:'AI Trading Terminal',short_name:'TradeTerminal',description:'Institutional AI Trading Research Terminal',start_url:'.',display:'standalone',background_color:'#080810',theme_color:'#080810',icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23080810'/%3E%3Ctext x='96' y='135' text-anchor='middle' font-size='110' fill='%237c6fff'%3E📊%3C/text%3E%3C/svg%3E",sizes:'192x192',type:'image/svg+xml'}]};
+const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'}));document.head.appendChild(ml);
+
+// SW with proper caching
+if('serviceWorker' in navigator){
+  const sw=`
+const CV='aitt-v2';
+const SHELL=['./'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CV).then(c=>c.addAll(SHELL)));self.skipWaiting();});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CV).map(k=>caches.delete(k)))).then(()=>clients.claim()));});
+self.addEventListener('fetch',e=>{
+  const u=e.request.url;
+  if(u.includes('api.groq.com')||u.includes('fonts.googleapis.com')){e.respondWith(fetch(e.request));return;}
+  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{if(res&&res.status===200){const rc=res.clone();caches.open(CV).then(c=>c.put(e.request,rc));}return res;}).catch(()=>caches.match('./'))));
+});`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+try{
+  const saved=localStorage.getItem('aitt_groqkey');
+  if(saved){state.apiKey=saved;document.getElementById('groqkey').value=saved;setConn('ok');}
+}catch(e){}
+
+buildAllChips();
+updateLabels();
+</script>
+</body>
+</html>
