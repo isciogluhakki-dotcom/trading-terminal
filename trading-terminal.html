@@ -468,71 +468,66 @@ function updateLabels(){
 }
 
 // ─── LIVE DATA FETCHER ───────────────────────────────────────────────────────
-const PROXY = 'https://trading-proxy.isciogluhakki.workers.dev';
-
 async function fetchLiveData(mkt, strat) {
   const data = { prices: {}, market: {} };
-
-  const indices = {
-    'NASDAQ': 'QQQ,AAPL,NVDA,MSFT,META,GOOGL,AMZN,TSLA,AMD,SMCI',
-    'S&P 500': 'SPY,AAPL,NVDA,MSFT,JPM,JNJ,V,PG,XOM,BRK-B',
-    'NYSE': 'KO,JPM,JNJ,XOM,CVX,BAC,WFC,GE,IBM,T',
-    'BIST': 'THYAO.IS,EREGL.IS,ASELS.IS,BIMAS.IS,AKBNK.IS,GARAN.IS,KCHOL.IS,TUPRS.IS,SISE.IS,FROTO.IS',
-    'Küresel': 'SPY,QQQ,EFA,EEM,GLD,TLT,DXY,VIX',
-    'Global': 'SPY,QQQ,EFA,EEM,GLD,TLT',
-    'AB': 'EZU,ASML,SAP,EWG,EWF,EWI,EWP',
-    'EU': 'EZU,ASML,SAP,EWG,EWF',
-    'Japonya': 'EWJ,NKY,7203.T,6758.T,9984.T',
-    'Japan': 'EWJ,NKY',
-  };
-
+  const now = new Date().toLocaleTimeString('tr-TR');
   const isCrypto = mkt === 'Kripto' || mkt === 'Crypto' || strat === 'Kripto' || strat === 'Crypto';
 
+  // --- BINANCE: Direkt tarayıcıdan, key yok, CORS açık ---
+  const cryptoSymbols = [
+    ['BTCUSDT','BTC'],['ETHUSDT','ETH'],['SOLUSDT','SOL'],
+    ['BNBUSDT','BNB'],['XRPUSDT','XRP'],['ADAUSDT','ADA'],
+    ['AVAXUSDT','AVAX'],['LINKUSDT','LINK'],['DOTUSDT','DOT'],
+    ['MATICUSDT','MATIC'],['DOGEUSDT','DOGE'],['LTCUSDT','LTC'],
+    ['TRXUSDT','TRX'],['ATOMUSDT','ATOM'],['UNIUSDT','UNI']
+  ];
+
   try {
-    // Fetch crypto prices
-    if (isCrypto) {
-      const r = await fetch(PROXY + '/crypto', {signal: AbortSignal.timeout(8000)});
-      if (r.ok) {
-        const d = await r.json();
-        const map = {bitcoin:'BTC',ethereum:'ETH',solana:'SOL',binancecoin:'BNB',ripple:'XRP',cardano:'ADA','avalanche-2':'AVAX',chainlink:'LINK',polkadot:'DOT','matic-network':'MATIC'};
-        let priceStr = '\n\n=== GÜNCEL KRİPTO FİYATLARI (CoinGecko canlı, ' + new Date().toLocaleTimeString('tr-TR') + ') ===\n';
-        for (const [id, sym] of Object.entries(map)) {
-          if (d[id]) {
-            priceStr += `${sym}: $${d[id].usd.toLocaleString()} (24s: ${d[id].usd_24h_change?.toFixed(2)}%)\n`;
-          }
-        }
-        data.prices.crypto = priceStr;
+    // Her zaman kripto fiyatlarını çek (kripto piyasası seçilmese de referans için)
+    const binanceRes = await fetch(
+      'https://api.binance.com/api/v3/ticker/24hr?' +
+      'symbols=' + encodeURIComponent(JSON.stringify(cryptoSymbols.map(([s])=>s))),
+      {signal: AbortSignal.timeout(6000)}
+    );
+    if (binanceRes.ok) {
+      const tickers = await binanceRes.json();
+      let priceStr = `\n=== CANLI KRİPTO FİYATLARI (Binance, ${now}) ===\n`;
+      for (const t of tickers) {
+        const sym = cryptoSymbols.find(([s])=>s===t.symbol)?.[1] || t.symbol;
+        const price = parseFloat(t.lastPrice);
+        const chg = parseFloat(t.priceChangePercent).toFixed(2);
+        const vol = (parseFloat(t.quoteVolume)/1e6).toFixed(1);
+        priceStr += `${sym}: $${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4})} (24s: ${chg >= 0 ? '+':''}${chg}%, Hacim: $${vol}M)\n`;
       }
+      data.prices.crypto = priceStr;
     }
+  } catch(e) { console.warn('Binance fetch failed:', e.message); }
 
-    // Fetch stock prices
-    const symbols = indices[mkt] || indices['S&P 500'];
-    const r2 = await fetch(PROXY + '/stocks?symbols=' + symbols, {signal: AbortSignal.timeout(8000)});
-    if (r2.ok) {
-      const yd = await r2.json();
-      const quotes = yd?.quoteResponse?.result || [];
-      if (quotes.length > 0) {
-        let mktStr = `\n\n=== CANLI PİYASA VERİSİ (Yahoo Finance, ${new Date().toLocaleTimeString('tr-TR')}) ===\n`;
-        for (const q of quotes) {
-          const chg = q.regularMarketChangePercent?.toFixed(2);
-          const price = q.regularMarketPrice?.toLocaleString('en-US');
-          const ema50 = q.fiftyDayAverage ? ` | EMA50: ${q.fiftyDayAverage.toFixed(2)}` : '';
-          const ema200 = q.twoHundredDayAverage ? ` | EMA200: ${q.twoHundredDayAverage.toFixed(2)}` : '';
-          mktStr += `${q.symbol}: $${price} (${chg >= 0 ? '+' : ''}${chg}%)${ema50}${ema200}\n`;
-        }
-        data.prices.stocks = mktStr;
-      }
+  // --- FRANKFURTER: Döviz kurları, key yok, CORS açık ---
+  try {
+    const fxRes = await fetch(
+      'https://api.frankfurter.app/latest?from=USD&to=EUR,GBP,JPY,TRY,CHF,CAD,AUD',
+      {signal: AbortSignal.timeout(5000)}
+    );
+    if (fxRes.ok) {
+      const fx = await fxRes.json();
+      let fxStr = `\n=== DÖVİZ KURLARI (${now}) ===\n`;
+      fxStr += `USD/TRY: ${fx.rates.TRY?.toFixed(2)} | USD/EUR: ${fx.rates.EUR?.toFixed(4)} | USD/GBP: ${fx.rates.GBP?.toFixed(4)}\n`;
+      fxStr += `USD/JPY: ${fx.rates.JPY?.toFixed(2)} | USD/CHF: ${fx.rates.CHF?.toFixed(4)}\n`;
+      data.prices.fx = fxStr;
     }
+  } catch(e) { console.warn('FX fetch failed:', e.message); }
 
-    // Fear & Greed
-    const r3 = await fetch(PROXY + '/feargreed', {signal: AbortSignal.timeout(5000)});
-    if (r3.ok) {
-      const fgd = await r3.json();
-      const val = fgd?.data?.[0];
-      if (val) data.market.fearGreed = `\nKorku & Açgözlülük Endeksi: ${val.value}/100 (${val.value_classification})`;
+  // --- FEAR & GREED (alternative.me CORS açık) ---
+  try {
+    const fgRes = await fetch('https://api.alternative.me/fng/?limit=1', {signal: AbortSignal.timeout(4000)});
+    if (fgRes.ok) {
+      const fg = await fgRes.json();
+      const val = fg?.data?.[0];
+      if (val) data.market.fearGreed = `\nKorku & Açgözlülük Endeksi: ${val.value}/100 (${val.value_classification})\n`;
     }
+  } catch(e) {}
 
-  } catch(e) { console.warn('Live data fetch failed:', e.message); }
   return data;
 }
 
@@ -561,11 +556,30 @@ async function runAnalysis(){
     if (liveData.prices.stocks) prompt += liveData.prices.stocks;
     if (liveData.market.fearGreed) prompt += liveData.market.fearGreed;
 
-    if (liveData.prices.crypto || liveData.prices.stocks) {
-      const livePrefix = state.lang === 'tr'
-        ? `ZORUNLU TALİMAT: Aşağıdaki GERÇEK ZAMANLI fiyat verilerini KULLANMAK ZORUNDASIN. Bu veriler şu an canlı olarak çekildi. Kendi eğitim verilerindeki fiyatları ASLA kullanma. Tablolarda mutlaka bu fiyatları yaz:\n`
-        : `MANDATORY INSTRUCTION: You MUST use the following REAL-TIME price data. This data was fetched live right now. NEVER use prices from your training data. Always use these exact prices in your tables:\n`;
-      prompt = livePrefix + (liveData.prices.crypto || '') + (liveData.prices.stocks || '') + (liveData.market.fearGreed || '') + '\n\n---\n\n' + prompt;
+    // Build live data block
+    const liveBlock = [
+      liveData.prices.crypto || '',
+      liveData.prices.fx || '',
+      liveData.market.fearGreed || '',
+    ].filter(Boolean).join('\n');
+
+    if (liveBlock) {
+      const mandatory = state.lang === 'tr'
+        ? `### ZORUNLU: AŞAĞIDAKI CANLI VERİLERİ KULLAN ###
+BU VERİLER ŞU AN BINANCE VE FRANKFURTER'DAN ÇEKEN GERÇEK ZAMANLI VERİLERDİR.
+TABLOLARDA MUTLAKA BU FİYATLARI YAZ. KENDİ EĞİTİM VERİLERİNİ KULLANMA!
+${liveBlock}
+### CANLI VERİ SONU ###
+
+`
+        : `### MANDATORY: USE THE FOLLOWING LIVE DATA ###
+THIS DATA WAS FETCHED RIGHT NOW FROM BINANCE AND FRANKFURTER APIs.
+YOU MUST USE THESE EXACT PRICES IN YOUR TABLES. DO NOT USE YOUR TRAINING DATA PRICES!
+${liveBlock}
+### END OF LIVE DATA ###
+
+`;
+      prompt = mandatory + prompt;
     }
 
     const useWS = state.webSearch;
