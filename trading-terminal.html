@@ -562,7 +562,10 @@ async function runAnalysis(){
     if (liveData.market.fearGreed) prompt += liveData.market.fearGreed;
 
     if (liveData.prices.crypto || liveData.prices.stocks) {
-      prompt += '\n\nÖNEMLİ: Yukarıdaki CANLI fiyat verilerini kullan. Bu fiyatlar gerçek zamanlıdır. Analiz tablolarında bu fiyatları baz al.';
+      const livePrefix = state.lang === 'tr'
+        ? `ZORUNLU TALİMAT: Aşağıdaki GERÇEK ZAMANLI fiyat verilerini KULLANMAK ZORUNDASIN. Bu veriler şu an canlı olarak çekildi. Kendi eğitim verilerindeki fiyatları ASLA kullanma. Tablolarda mutlaka bu fiyatları yaz:\n`
+        : `MANDATORY INSTRUCTION: You MUST use the following REAL-TIME price data. This data was fetched live right now. NEVER use prices from your training data. Always use these exact prices in your tables:\n`;
+      prompt = livePrefix + (liveData.prices.crypto || '') + (liveData.prices.stocks || '') + (liveData.market.fearGreed || '') + '\n\n---\n\n' + prompt;
     }
 
     const useWS = state.webSearch;
