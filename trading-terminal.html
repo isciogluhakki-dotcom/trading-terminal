@@ -503,6 +503,55 @@ async function fetchLiveData(mkt, strat) {
     }
   } catch(e) { console.warn('Binance fetch failed:', e.message); }
 
+  // --- YAHOO FINANCE v8: Hisse fiyatları, CORS açık ---
+  const stockLists = {
+    'BIST': ['THYAO.IS','EREGL.IS','ASELS.IS','BIMAS.IS','AKBNK.IS','GARAN.IS','KCHOL.IS','TUPRS.IS','SISE.IS','FROTO.IS','TOASO.IS','SAHOL.IS'],
+    'NASDAQ': ['AAPL','NVDA','MSFT','META','GOOGL','AMZN','TSLA','AMD','SMCI','INTC'],
+    'S&P 500': ['AAPL','NVDA','MSFT','JPM','JNJ','V','PG','XOM','BAC','WFC'],
+    'NYSE': ['KO','JPM','JNJ','XOM','CVX','BAC','WFC','GE','IBM','T'],
+    'AB': ['ASML','SAP','NESN.SW','LVMH.PA','SIE.DE','AIR.PA','MC.PA','OR.PA'],
+    'EU': ['ASML','SAP','NESN.SW','LVMH.PA','SIE.DE'],
+    'Japonya': ['7203.T','6758.T','9984.T','6861.T','8306.T'],
+    'Japan': ['7203.T','6758.T','9984.T'],
+    'Küresel': ['AAPL','NVDA','MSFT','GOOGL','AMZN','THYAO.IS','ASML','7203.T'],
+    'Global': ['AAPL','NVDA','MSFT','GOOGL','AMZN','ASML'],
+  };
+
+  const stockSymbols = stockLists[mkt] || stockLists['NASDAQ'];
+  try {
+    const stockResults = await Promise.allSettled(
+      stockSymbols.slice(0,8).map(sym =>
+        fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`, {signal: AbortSignal.timeout(5000)})
+          .then(r => r.json())
+          .then(d => {
+            const meta = d?.chart?.result?.[0]?.meta;
+            if (!meta) return null;
+            return {
+              symbol: meta.symbol,
+              price: meta.regularMarketPrice,
+              prev: meta.chartPreviousClose,
+              high: meta.regularMarketDayHigh,
+              low: meta.regularMarketDayLow,
+              volume: meta.regularMarketVolume,
+              currency: meta.currency,
+              name: meta.shortName || meta.symbol,
+            };
+          })
+      )
+    );
+
+    const quotes = stockResults.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value);
+    if (quotes.length > 0) {
+      let stockStr = `\n=== CANLI HİSSE FİYATLARI (Yahoo Finance, ${now}) ===\n`;
+      for (const q of quotes) {
+        const chgPct = q.prev ? (((q.price - q.prev) / q.prev) * 100).toFixed(2) : '0.00';
+        const volM = (q.volume / 1e6).toFixed(1);
+        stockStr += `${q.symbol} (${q.name}): ${q.price?.toLocaleString('en-US')} ${q.currency} (${chgPct >= 0 ? '+' : ''}${chgPct}%, H:${q.high} L:${q.low}, Vol:${volM}M)\n`;
+      }
+      data.prices.stocks = stockStr;
+    }
+  } catch(e) { console.warn('Stock fetch failed:', e.message); }
+
   // --- FRANKFURTER: Döviz kurları, key yok, CORS açık ---
   try {
     const fxRes = await fetch(
@@ -559,6 +608,7 @@ async function runAnalysis(){
     // Build live data block
     const liveBlock = [
       liveData.prices.crypto || '',
+      liveData.prices.stocks || '',
       liveData.prices.fx || '',
       liveData.market.fearGreed || '',
     ].filter(Boolean).join('\n');
